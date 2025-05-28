@@ -13,13 +13,13 @@ pub enum HasherEnum {
     None,
 }
 
-pub impl HasherEnum {
+impl HasherEnum {
     /// Updates the internal state of the hasher with the provided data.
     ///
     /// # Arguments
     ///
     /// * `data` - A byte slice to update the hash with.
-    fn update(&mut self, data: &[u8]) {
+    pub fn update(&mut self, data: &[u8]) {
         match self {
             HasherEnum::Sha1(h) => h.update(data),
             HasherEnum::Sha256(h) => h.update(data),
@@ -29,7 +29,7 @@ pub impl HasherEnum {
     }
 
     /// Finalizes the hash computation and returns the resulting digest as a byte vector.
-    fn finalize(self) -> Vec<u8> {
+    pub fn finalize(self) -> Vec<u8> {
         match self {
             HasherEnum::Sha1(h) => h.finalize().to_vec(),
             HasherEnum::Sha256(h) => h.finalize().to_vec(),
