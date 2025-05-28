@@ -6,3 +6,4 @@ This library provides a set of utilities used by Junco, a modern Launcher for Mi
 ## Features
 - **MCMeta Parser**: A parser for `mcmeta` files, which are used to define metadata for Minecraft resources.
 - **options.txt Parser**: A parser for `options.txt` files, which store user preferences for Minecraft.
+- **Filesystem Utilities**: A collection of utilities for working with the filesystem, including file and directory operations.

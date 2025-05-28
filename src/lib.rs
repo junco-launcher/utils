@@ -14,3 +14,28 @@ pub mod options_parser;
 /// This module provides types and functions to read and interpret `.mcmeta` files
 /// into Rust data structures.
 pub mod mcmeta_parser;
+
+/// Filesystem utilities for common tasks in a clean and cross-platform way.
+///
+/// # Features
+/// - create/remove files or directories (optionally recursive)
+/// - check if files or directories exist
+/// - read/write files with options
+/// - move/copy files with optional overwrite
+/// - expand `~` to home directory
+/// - custom error type for better error handling
+///
+/// # Errors
+/// Everything returns a `Result<T, FilesystemError>`.
+///
+/// # Compatibility
+/// Uses `Path`, `PathBuf`, and `dirs` for home dir expansion. Works on all platforms.
+///
+/// # Example
+/// ```rust
+/// use crate::junco_launcher_utils::filesystem::{create_if_not_exists, write_file, WriteOptions};
+///
+/// create_if_not_exists("my_dir", true)?;
+/// write_file("my_dir/hello.txt", "hello", WriteOptions::default())?;
+/// ```
+pub mod filesystem;
