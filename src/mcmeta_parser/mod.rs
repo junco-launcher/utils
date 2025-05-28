@@ -65,24 +65,27 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
-    fn write_temp_mcmeta(content: &str) -> std::path::PathBuf {
-        let dir = tempdir().unwrap();
+    fn write_temp_mcmeta(content: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
         let file_path = dir.path().join("pack.mcmeta");
         let mut file = File::create(&file_path).unwrap();
         file.write_all(content.as_bytes()).unwrap();
-        file_path
+        (dir, file_path)
     }
 
     #[test]
     fn parses_valid_mcmeta_file() {
         let mcmeta_content = r#"{
-            "pack": {
-                "pack_format": 6,
-                "description": "A test resource pack"
-            }
-        }"#;
-        let file_path = write_temp_mcmeta(mcmeta_content);
+        "pack": {
+            "pack_format": 6,
+            "description": "A test resource pack"
+        }
+    }"#;
+        let (_dir, file_path) = write_temp_mcmeta(mcmeta_content);
         let result = parse_resource_pack_mcmeta(&file_path);
+        if let Err(e) = &result {
+            println!("error parsing mcmeta: {:?}", e);
+        }
         assert!(result.is_ok());
         let mcmeta = result.unwrap();
         assert_eq!(mcmeta.pack.pack_format, 6);
@@ -103,7 +106,7 @@ mod tests {
                 "description": "Invalid format"
             }
         }"#;
-        let file_path = write_temp_mcmeta(mcmeta_content);
+        let (_dir, file_path) = write_temp_mcmeta(mcmeta_content);
         let result = parse_resource_pack_mcmeta(&file_path);
         assert!(result.is_err());
     }
@@ -116,14 +119,14 @@ mod tests {
                 "description": "Missing pack section"
             }
         }"#;
-        let file_path = write_temp_mcmeta(mcmeta_content);
+        let (_dir, file_path) = write_temp_mcmeta(mcmeta_content);
         let result = parse_resource_pack_mcmeta(&file_path);
         assert!(result.is_err());
     }
 
     #[test]
     fn returns_error_for_empty_file() {
-        let file_path = write_temp_mcmeta("");
+        let (_dir, file_path) = write_temp_mcmeta("");
         let result = parse_resource_pack_mcmeta(&file_path);
         assert!(result.is_err());
     }

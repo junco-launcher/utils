@@ -19,6 +19,7 @@ impl HasherEnum {
     /// # Arguments
     ///
     /// * `data` - A byte slice to update the hash with.
+    #[inline]
     pub fn update(&mut self, data: &[u8]) {
         match self {
             HasherEnum::Sha1(h) => h.update(data),
@@ -29,6 +30,7 @@ impl HasherEnum {
     }
 
     /// Finalizes the hash computation and returns the resulting digest as a byte vector.
+    #[inline]
     pub fn finalize(self) -> Vec<u8> {
         match self {
             HasherEnum::Sha1(h) => h.finalize().to_vec(),
@@ -152,4 +154,182 @@ pub fn verify_hash(path: &Path, expected: &str) -> io::Result<bool> {
 
     let actual = hex::encode(hasher.finalize());
     Ok(actual == expected)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::io::Write as IoWrite;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn download_to_file_saves_file_and_verifies_hash() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"hello world";
+        let hash = hex::encode(sha1::Sha1::digest(content));
+
+        let server = httpmock::MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path("/file.txt");
+            then.status(200)
+                .header("content-type", "application/octet-stream")
+                .body(content);
+        });
+
+        download_to_file(
+            &format!("{}/file.txt", server.url("")),
+            file_path.to_str().unwrap(),
+            Some(&hash),
+            true,
+        )
+            .await
+            .unwrap();
+
+        let file_content = fs::read(&file_path).unwrap();
+        assert_eq!(file_content, content);
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn download_to_file_returns_error_on_hash_mismatch() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"hello world";
+        let wrong_hash = "0000000000000000000000000000000000000000";
+
+        let server = httpmock::MockServer::start();
+        server.mock(|when, then| {
+            when.method("GET").path("/file.txt");
+            then.status(200).body(content);
+        });
+
+        let result = download_to_file(
+            &format!("{}/file.txt", server.url("")),
+            file_path.to_str().unwrap(),
+            Some(wrong_hash),
+            true,
+        )
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn download_to_file_skips_download_if_file_exists_and_hash_matches() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"hello world";
+        let hash = hex::encode(sha1::Sha1::digest(content));
+        let mut f = File::create(&file_path).unwrap();
+        f.write_all(content).unwrap();
+
+        let server = httpmock::MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path("/file.txt");
+            then.status(200).body("should not be called");
+        });
+
+        download_to_file(
+            &format!("{}/file.txt", server.url("")),
+            file_path.to_str().unwrap(),
+            Some(&hash),
+            false,
+        )
+            .await
+            .unwrap();
+
+        mock.assert_hits(0);
+    }
+
+    #[tokio::test]
+    async fn download_to_file_creates_parent_directories() {
+        let dir = tempdir().unwrap();
+        let nested_path = dir.path().join("a/b/c/file.txt");
+        let content = b"abc";
+        let server = httpmock::MockServer::start();
+        server.mock(|when, then| {
+            when.method("GET").path("/file.txt");
+            then.status(200).body(content);
+        });
+
+        download_to_file(
+            &format!("{}/file.txt", server.url("")),
+            nested_path.to_str().unwrap(),
+            None,
+            true,
+        )
+            .await
+            .unwrap();
+
+        assert!(nested_path.exists());
+        let file_content = fs::read(&nested_path).unwrap();
+        assert_eq!(file_content, content);
+    }
+
+    #[tokio::test]
+    async fn download_to_file_returns_error_on_http_failure() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let server = httpmock::MockServer::start();
+        server.mock(|when, then| {
+            when.method("GET").path("/file.txt");
+            then.status(404);
+        });
+
+        let result = download_to_file(
+            &format!("{}/file.txt", server.url("")),
+            file_path.to_str().unwrap(),
+            None,
+            true,
+        )
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn verify_hash_returns_true_on_matching_hash() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"hash me";
+        let mut f = File::create(&file_path).unwrap();
+        f.write_all(content).unwrap();
+        let hash = hex::encode(sha1::Sha1::digest(content));
+        assert!(verify_hash(&file_path, &hash).unwrap());
+    }
+
+    #[test]
+    fn verify_hash_returns_false_on_non_matching_hash() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"hash me";
+        let mut f = File::create(&file_path).unwrap();
+        f.write_all(content).unwrap();
+        let wrong_hash = "0000000000000000000000000000000000000000";
+        assert!(!verify_hash(&file_path, wrong_hash).unwrap());
+    }
+
+    #[test]
+    fn verify_hash_returns_true_for_sha256_and_sha512() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        let content = b"abc123";
+        let mut f = File::create(&file_path).unwrap();
+        f.write_all(content).unwrap();
+
+        let sha256 = hex::encode(sha2::Sha256::digest(content));
+        let sha512 = hex::encode(sha2::Sha512::digest(content));
+        assert!(verify_hash(&file_path, &sha256).unwrap());
+        assert!(verify_hash(&file_path, &sha512).unwrap());
+    }
+
+    #[test]
+    fn verify_hash_returns_true_when_expected_is_empty_and_file_is_empty() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("file.txt");
+        File::create(&file_path).unwrap();
+        assert!(verify_hash(&file_path, "").unwrap());
+    }
 }
