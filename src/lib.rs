@@ -39,4 +39,5 @@ pub mod mcmeta_parser;
 /// write_file("my_dir/hello.txt", "hello", WriteOptions::default())?;
 /// ```
 pub mod filesystem;
-mod http;
+
+pub mod http;
