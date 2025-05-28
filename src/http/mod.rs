@@ -6,14 +6,14 @@ use std::io::{self, BufReader, Read, Write};
 use std::path::Path;
 
 /// Enum representing supported hashers for file integrity verification.
-enum HasherEnum {
+pub enum HasherEnum {
     Sha1(Sha1),
     Sha256(Sha256),
     Sha512(Sha512),
     None,
 }
 
-impl HasherEnum {
+pub impl HasherEnum {
     /// Updates the internal state of the hasher with the provided data.
     ///
     /// # Arguments
@@ -130,7 +130,7 @@ pub async fn download_to_file(
 /// # Returns
 ///
 /// * `io::Result<bool>` - Returns `Ok(true)` if the hash matches, `Ok(false)` otherwise, or an error if reading fails.
-fn verify_hash(path: &Path, expected: &str) -> io::Result<bool> {
+pub fn verify_hash(path: &Path, expected: &str) -> io::Result<bool> {
     let f = File::open(path)?;
     let mut reader = BufReader::new(f);
 
