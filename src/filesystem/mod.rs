@@ -202,28 +202,26 @@ pub fn write_file<P: AsRef<Path>>(path: P, content: &str, options: WriteOptions)
 ///
 /// * `path` - Path string, possibly starting with `~`.
 ///
-/// # Errors
-///
-/// Returns `FilesystemError` if the path is empty, home directory cannot be found,
-/// or user expansion is not supported.
-///
 /// # Returns
 ///
-/// The expanded `PathBuf`.
-pub fn expand_home(path: &str) -> Result<PathBuf, FilesystemError> {
+/// The expanded `PathBuf`, or empty if expansion fails.
+pub fn expand_home(path: &str) -> PathBuf {
     if path.is_empty() {
-        return Err(FilesystemError::EmptyPath);
+        return PathBuf::new();
     }
     if !path.starts_with('~') {
-        return Ok(PathBuf::from(path));
+        return PathBuf::from(path);
     }
-    let home = dirs::home_dir().ok_or(FilesystemError::HomeDirNotFound)?;
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return PathBuf::new(),
+    };
     if path == "~" {
-        return Ok(home);
+        return home;
     }
     if path.starts_with("~/") || path.starts_with("~\\") {
         let without_tilde = &path[2..];
-        return Ok(home.join(without_tilde));
+        return home.join(without_tilde);
     }
-    Err(FilesystemError::UserExpansionNotSupported)
+    PathBuf::new()
 }
