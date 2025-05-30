@@ -55,12 +55,19 @@ impl Default for RemoveOptions {
 ///
 /// Returns `FilesystemError` if the directory cannot be created.
 pub fn create_if_not_exists<P: AsRef<Path>>(dir: P, recursive: bool) -> Result<(), FilesystemError> {
-    let path = expand_home(dir.as_ref().to_str().ok_or(FilesystemError::EmptyPath)?);
-    if recursive {
-        fs::create_dir_all(path)?;
-    } else {
-        fs::create_dir(path)?;
+    let raw_path = dir.as_ref().to_str().ok_or(FilesystemError::EmptyPath)?;
+    let path = expand_home(raw_path);
+
+    if path.exists() {
+        return Ok(());
     }
+
+    if recursive {
+        fs::create_dir_all(&path)?;
+    } else {
+        fs::create_dir(&path)?;
+    }
+
     Ok(())
 }
 
